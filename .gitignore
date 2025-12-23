@@ -1,0 +1,32 @@
+# Composer
+/vendor/
+
+# Node
+/node_modules/
+/public/build/
+
+# Laravel
+/.env
+/.env.*
+/storage/*.key
+/storage/logs/
+/storage/framework/cache/
+/storage/framework/sessions/
+/storage/framework/views/
+/bootstrap/cache/*.php
+
+# IDE / OS
+/.idea/
+/.vscode/
+/*.iml
+.DS_Store
+Thumbs.db
+
+# Misc
+/phpstan-result-cache.php
+
+# Nested node_modules (frontend etc.)
+**/node_modules/
+
+# Optional: ignore local docs for this repo
+*.md
