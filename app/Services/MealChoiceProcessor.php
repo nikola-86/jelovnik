@@ -101,13 +101,20 @@ class MealChoiceProcessor
      */
     private function createOrUpdateMealChoice(Employee $employee, array $row): array
     {
+        $date = \Carbon\Carbon::parse($row['date']);
+        
         /** @var MealChoice $mealChoice */
-        $mealChoice = MealChoice::firstOrNew([
-            'employee_id' => $employee->id,
-            'date' => $row['date'],
-        ]);
-
-        $wasNew = !$mealChoice->exists;
+        $mealChoice = MealChoice::where('employee_id', $employee->id)
+            ->whereDate('date', $date->format('Y-m-d'))
+            ->first();
+        
+        $wasNew = $mealChoice === null;
+        
+        if ($wasNew) {
+            $mealChoice = new MealChoice();
+            $mealChoice->employee_id = $employee->id;
+            $mealChoice->date = $date->format('Y-m-d');
+        }
 
         $mealChoice->choice = $row['choice'];
         $mealChoice->save();

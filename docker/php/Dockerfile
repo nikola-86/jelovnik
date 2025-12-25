@@ -4,18 +4,15 @@ FROM php:8.3-fpm
 RUN apt-get update && apt-get install -y \
     libzip-dev \
     libsqlite3-dev \
+    default-mysql-client \
+    libmariadb-dev \
     unzip \
-    && docker-php-ext-install pdo pdo_sqlite zip \
+    && docker-php-ext-install pdo pdo_mysql pdo_sqlite zip \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Set proper permissions for Laravel directories
-RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 775 /var/www/html/storage \
-    && chmod -R 775 /var/www/html/bootstrap/cache \
-    && chmod -R 775 /var/www/html/database \
-    && mkdir -p /var/www/html/storage/app/temp \
-    && chmod -R 775 /var/www/html/storage/app/temp
+# Note: Permissions for Laravel directories are set at runtime via setup.sh
+# since /var/www/html is mounted as a volume and doesn't exist during build
 
 WORKDIR /var/www/html
 

@@ -9,8 +9,28 @@ class CsvDataProvider implements DataProviderInterface
     public function getData(string $source): array
     {
         $handle = $this->openFile($source);
-        $columnMap = $this->buildColumnMap($handle);
-        $rows = $this->parseRows($handle, $columnMap);
+        
+        // Read first line to check if it's a header
+        $firstLine = fgetcsv($handle);
+        
+        if ($firstLine === false) {
+            fclose($handle);
+            return [];
+        }
+        
+        $columnMap = $this->determineColumnMap($firstLine);
+        $rows = [];
+        
+        // If first line was a header, parse remaining rows
+        // If first line was data, include it in parsing
+        if ($this->isHeader($firstLine)) {
+            $rows = $this->parseRows($handle, $columnMap);
+        } else {
+            // First line is data, parse it and remaining rows
+            $rows = $this->parseRowData($firstLine, $columnMap, $rows);
+            $rows = $this->parseRows($handle, $columnMap, $rows);
+        }
+        
         fclose($handle);
 
         return $rows;
@@ -21,27 +41,36 @@ class CsvDataProvider implements DataProviderInterface
      */
     private function openFile(string $filePath)
     {
-        $handle = fopen($filePath, 'r');
+        $handle = @fopen($filePath, 'r');
         
         if ($handle === false) {
-            throw new \RuntimeException('Could not open file');
+            $error = error_get_last();
+            throw new \RuntimeException('Could not open file' . ($error ? ': ' . $error['message'] : ''));
         }
 
         return $handle;
     }
 
     /**
-     * Build column mapping from header or use defaults
+     * Check if a line is a header row
      */
-    private function buildColumnMap($handle): array
+    private function isHeader(array $line): bool
     {
-        $header = fgetcsv($handle);
+        if (count($line) < 4) {
+            return false;
+        }
         
-        if ($header && count($header) >= 4) {
-            $map = $this->mapHeaderColumns($header);
-            if (!empty($map)) {
-                return $map;
-            }
+        $map = $this->mapHeaderColumns($line);
+        return !empty($map) && count($map) >= 4;
+    }
+
+    /**
+     * Determine column mapping from first line or use defaults
+     */
+    private function determineColumnMap(array $firstLine): array
+    {
+        if ($this->isHeader($firstLine)) {
+            return $this->mapHeaderColumns($firstLine);
         }
 
         return $this->getDefaultColumnMap();
@@ -90,30 +119,39 @@ class CsvDataProvider implements DataProviderInterface
     /**
      * Parse CSV rows and return validated data
      */
-    private function parseRows($handle, array $columnMap): array
+    private function parseRows($handle, array $columnMap, array $existingRows = []): array
     {
-        $rows = [];
+        $rows = $existingRows;
 
         while (($data = fgetcsv($handle)) !== false) {
-            if (count($data) < 4) {
-                continue;
-            }
-
-            $row = $this->mapRowData($data, $columnMap);
-
-            if (!$this->isValidRow($row)) {
-                continue;
-            }
-
-            $row['date'] = $this->normalizeDate($row['date']);
-            
-            if ($row['date'] === null) {
-                continue;
-            }
-
-            $rows[] = $row;
+            $rows = $this->parseRowData($data, $columnMap, $rows);
         }
 
+        return $rows;
+    }
+
+    /**
+     * Parse a single row of data and add to rows array if valid
+     */
+    private function parseRowData(array $data, array $columnMap, array $rows): array
+    {
+        if (count($data) < 4) {
+            return $rows;
+        }
+
+        $row = $this->mapRowData($data, $columnMap);
+
+        if (!$this->isValidRow($row)) {
+            return $rows;
+        }
+
+        $row['date'] = $this->normalizeDate($row['date']);
+        
+        if ($row['date'] === null) {
+            return $rows;
+        }
+
+        $rows[] = $row;
         return $rows;
     }
 
@@ -122,14 +160,18 @@ class CsvDataProvider implements DataProviderInterface
      */
     private function mapRowData(array $data, array $columnMap): array
     {
+        $slackId = null;
+        if (isset($columnMap['slack_id']) && isset($data[$columnMap['slack_id']])) {
+            $slackIdValue = trim($data[$columnMap['slack_id']]);
+            $slackId = $slackIdValue !== '' ? $slackIdValue : null;
+        }
+        
         return [
             'name' => trim($data[$columnMap['name']] ?? $data[0] ?? ''),
             'email' => trim($data[$columnMap['email']] ?? $data[1] ?? ''),
             'choice' => trim($data[$columnMap['choice']] ?? $data[2] ?? ''),
             'date' => trim($data[$columnMap['date']] ?? $data[3] ?? ''),
-            'slack_id' => isset($columnMap['slack_id']) && isset($data[$columnMap['slack_id']]) 
-                ? trim($data[$columnMap['slack_id']]) 
-                : null,
+            'slack_id' => $slackId,
         ];
     }
 

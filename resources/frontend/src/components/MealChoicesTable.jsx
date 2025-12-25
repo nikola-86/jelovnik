@@ -62,10 +62,12 @@ const MealChoicesTable = () => {
                         {item.employee.email}
                       </small>
                       {!hasSlackId && (
-                        <br />
-                        <small style={{ color: '#ed8936', fontSize: '11px', fontWeight: '600' }}>
-                          ⚠️ No Slack ID
-                        </small>
+                        <>
+                          <br />
+                          <small style={{ color: '#ed8936', fontSize: '11px', fontWeight: '600' }}>
+                            ⚠️ No Slack ID
+                          </small>
+                        </>
                       )}
                     </td>
                     <td>
